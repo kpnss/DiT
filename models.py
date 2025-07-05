@@ -162,7 +162,7 @@ class DiT(nn.Module):
         super().__init__()
         self.learn_sigma = learn_sigma
         self.in_channels = in_channels
-        self.out_channels = 32
+        self.out_channels = 128
         self.patch_size = patch_size
         self.num_heads = num_heads
 
