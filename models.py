@@ -230,42 +230,42 @@ class DiT(nn.Module):
         imgs = x.reshape(shape=(x.shape[0], c, h * p, h * p))
         return imgs
 
-def forward(self, x, t, y): #questo è il forward aggiornato dopo che mi aveva reso grigie tutte le cazzo di immagini 
-    """
-    Forward pass of DiT.
-    Args:
-        x: (N, C, H, W) - latenti dell'immagine (es. [B, 4, 32, 32])
-        t: (N,) - timestep di diffusione
-        y: (N, D) - condizione da CLIP già proiettata (es. [B, D])
-    Returns:
-        x: (N, out_channels, H, W) - predizione del rumore (o rumore + varianza)
-    """
-    # Patch embedding + positional encoding → [B, T, D]
-    x = self.x_embedder(x) + self.pos_embed
-
-    # Aggiungi y (CLIP embedding proiettato) come class token → [B, 1, D]
-    cond_token = y.unsqueeze(1)
-
-    # Concatenazione → [B, T+1, D]
-    x = torch.cat([cond_token, x], dim=1)
-
-    # Time embedding → [B, D]
-    t = self.t_embedder(t)
-
-    # Passa attraverso tutti i blocchi Transformer
-    for block in self.blocks:
-        x = block(x, t)
-
-    # Final layer
-    x = self.final_layer(x, t)
-
-    # Rimuovi il cond token (opzionale: dipende se final_layer lo gestisce già)
-    x = x[:, 1:]  # se necessario, altrimenti lascia com'è
-
-    # Ricostruisci l'immagine da patch
-    x = self.unpatchify(x)
-
-    return x
+    def forward(self, x, t, y): #questo è il forward aggiornato dopo che mi aveva reso grigie tutte le cazzo di immagini 
+        """
+        Forward pass of DiT.
+        Args:
+            x: (N, C, H, W) - latenti dell'immagine (es. [B, 4, 32, 32])
+            t: (N,) - timestep di diffusione
+            y: (N, D) - condizione da CLIP già proiettata (es. [B, D])
+        Returns:
+            x: (N, out_channels, H, W) - predizione del rumore (o rumore + varianza)
+        """
+        # Patch embedding + positional encoding → [B, T, D]
+        x = self.x_embedder(x) + self.pos_embed
+    
+        # Aggiungi y (CLIP embedding proiettato) come class token → [B, 1, D]
+        cond_token = y.unsqueeze(1)
+    
+        # Concatenazione → [B, T+1, D]
+        x = torch.cat([cond_token, x], dim=1)
+    
+        # Time embedding → [B, D]
+        t = self.t_embedder(t)
+    
+        # Passa attraverso tutti i blocchi Transformer
+        for block in self.blocks:
+            x = block(x, t)
+    
+        # Final layer
+        x = self.final_layer(x, t)
+    
+        # Rimuovi il cond token (opzionale: dipende se final_layer lo gestisce già)
+        x = x[:, 1:]  # se necessario, altrimenti lascia com'è
+    
+        # Ricostruisci l'immagine da patch
+        x = self.unpatchify(x)
+    
+        return x
 
 
     def forward_with_cfg(self, x, t, y, cfg_scale):
