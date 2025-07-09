@@ -230,22 +230,43 @@ class DiT(nn.Module):
         imgs = x.reshape(shape=(x.shape[0], c, h * p, h * p))
         return imgs
 
-    def forward(self, x, t, y):
-        """
-        Forward pass of DiT.
-        x: (N, C, H, W) tensor of spatial inputs (images or latent representations of images)
-        t: (N,) tensor of diffusion timesteps
-        y: (N,) tensor of class labels
-        """
-        x = self.x_embedder(x) + self.pos_embed  # (N, T, D), where T = H * W / patch_size ** 2
-        t = self.t_embedder(t)                   # (N, D)
-        # y = self.y_embedder(y, self.training)    # (N, D) non mi serve perche ho clip conditioning e non piu class conditioning
-        c = t + y                                # (N, D)
-        for block in self.blocks:
-            x = block(x, c)                      # (N, T, D)
-        x = self.final_layer(x, c)                # (N, T, patch_size ** 2 * out_channels)
-        x = self.unpatchify(x)                   # (N, out_channels, H, W)
-        return x
+def forward(self, x, t, y): #questo è il forward aggiornato dopo che mi aveva reso grigie tutte le cazzo di immagini 
+    """
+    Forward pass of DiT.
+    Args:
+        x: (N, C, H, W) - latenti dell'immagine (es. [B, 4, 32, 32])
+        t: (N,) - timestep di diffusione
+        y: (N, D) - condizione da CLIP già proiettata (es. [B, D])
+    Returns:
+        x: (N, out_channels, H, W) - predizione del rumore (o rumore + varianza)
+    """
+    # Patch embedding + positional encoding → [B, T, D]
+    x = self.x_embedder(x) + self.pos_embed
+
+    # Aggiungi y (CLIP embedding proiettato) come class token → [B, 1, D]
+    cond_token = y.unsqueeze(1)
+
+    # Concatenazione → [B, T+1, D]
+    x = torch.cat([cond_token, x], dim=1)
+
+    # Time embedding → [B, D]
+    t = self.t_embedder(t)
+
+    # Passa attraverso tutti i blocchi Transformer
+    for block in self.blocks:
+        x = block(x, t)
+
+    # Final layer
+    x = self.final_layer(x, t)
+
+    # Rimuovi il cond token (opzionale: dipende se final_layer lo gestisce già)
+    x = x[:, 1:]  # se necessario, altrimenti lascia com'è
+
+    # Ricostruisci l'immagine da patch
+    x = self.unpatchify(x)
+
+    return x
+
 
     def forward_with_cfg(self, x, t, y, cfg_scale):
         """
