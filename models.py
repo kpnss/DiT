@@ -204,10 +204,10 @@ class DiT(nn.Module):
         nn.init.normal_(self.t_embedder.mlp[0].weight, std=0.02)
         nn.init.normal_(self.t_embedder.mlp[2].weight, std=0.02)
 
-        # Zero-out adaLN modulation layers in DiT blocks:
+        # Small values for adaLN modulation layers in DiT blocks:
         for block in self.blocks:
-            nn.init.constant_(block.adaLN_modulation[-1].weight, 0)
-            nn.init.constant_(block.adaLN_modulation[-1].bias, 0)
+            nn.init.normal_(block.adaLN_modulation[-1].weight, mean=0.0, std=0.02)
+            nn.init.constant_(block.adaLN_modulation[-1].bias, 0.0)
 
         # Zero-out output layers:
         nn.init.constant_(self.final_layer.adaLN_modulation[-1].weight, 0)
@@ -255,12 +255,12 @@ class DiT(nn.Module):
         # Passa attraverso tutti i blocchi Transformer
         for block in self.blocks:
             x = block(x, t)
-    
-        # Final layer
-        x = self.final_layer(x, t)
-    
+
         # Rimuovi il cond token (opzionale: dipende se final_layer lo gestisce già)
         x = x[:, 1:]  # se necessario, altrimenti lascia com'è
+        
+        # Final layer
+        x = self.final_layer(x, t)
     
         # Ricostruisci l'immagine da patch
         x = self.unpatchify(x)
