@@ -115,8 +115,16 @@ class DiTBlock(nn.Module):
             nn.Linear(hidden_size, 6 * hidden_size, bias=True)
         )
 
-    def forward(self, x, c):
-        shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = self.adaLN_modulation(c).chunk(6, dim=1)
+    def forward(self, x, t, y):
+        """
+        x: [B, T+1, D] - sequenza patch+token
+        t: [B, D] - time embedding
+        y: [B, D] - CLIP condition embedding
+        """
+        cond = t + y  # oppure torch.cat([t, y], dim=1) se vuoi più capacità
+    
+        shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = self.adaLN_modulation(cond).chunk(6, dim=1)
+    
         x = x + gate_msa.unsqueeze(1) * self.attn(modulate(self.norm1(x), shift_msa, scale_msa))
         x = x + gate_mlp.unsqueeze(1) * self.mlp(modulate(self.norm2(x), shift_mlp, scale_mlp))
         return x
@@ -230,7 +238,7 @@ class DiT(nn.Module):
         imgs = x.reshape(shape=(x.shape[0], c, h * p, h * p))
         return imgs
 
-    def forward(self, x, t, y): #questo è il forward aggiornato dopo che mi aveva reso grigie tutte le cazzo di immagini 
+    def forward(self, x, t, y): 
         """
         Forward pass of DiT.
         Args:
@@ -238,7 +246,7 @@ class DiT(nn.Module):
             t: (N,) - timestep di diffusione
             y: (N, D) - condizione da CLIP già proiettata (es. [B, D])
         Returns:
-            x: (N, out_channels, H, W) - predizione del rumore (o rumore + varianza)
+            x: (N, out_channels, H, W) - predizione del rumore
         """
         # Patch embedding + positional encoding → [B, T, D]
         x = self.x_embedder(x) + self.pos_embed
@@ -254,11 +262,11 @@ class DiT(nn.Module):
     
         # Passa attraverso tutti i blocchi Transformer
         for block in self.blocks:
-            x = block(x, t)
-
+            x = block(x, t, y)  # <-- fix qui
+    
         # Rimuovi il cond token (opzionale: dipende se final_layer lo gestisce già)
-        x = x[:, 1:]  # se necessario, altrimenti lascia com'è
-        
+        x = x[:, 1:]
+    
         # Final layer
         x = self.final_layer(x, t)
     
@@ -266,7 +274,6 @@ class DiT(nn.Module):
         x = self.unpatchify(x)
     
         return x
-
 
     def forward_with_cfg(self, x, t, y, cfg_scale):
         """
